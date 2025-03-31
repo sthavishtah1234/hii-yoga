@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yoga Courses - STHAVISHTA YOGA AND WELLNESS</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
+</head>
+<body class="min-h-screen bg-gradient-to-b from-green-50 to-blue-50">
+    <div class="container mx-auto py-6">
+        <div class="flex justify-between items-center mb-6">
+            <div class="flex items-center">
+                <div class="h-10 w-10 relative mr-2">
+                    <img src="/images/logo.png" alt="STHAVISHTA YOGA AND WELLNESS" class="object-contain h-full w-full">
+                </div>
+                <div>
+                    <h1 class="text-3xl font-bold text-green-800">Available Yoga Courses</h1>
+                    <p class="text-gray-500">Access your courses based on your local time</p>
+                </div>
+            </div>
+            <div>
+                <a href="/" class="inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium bg-white hover:bg-gray-50">
+                    Back to Home
+                </a>
+            </div>
+        </div>
+
+        <div class="text-center py-12 bg-white rounded-lg border border-green-100">
+            <div class="h-12 w-12 mx-auto mb-4 text-green-300">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+            </div>
+            <h3 class="text-lg font-medium mb-2 text-green-800">Loading Courses...</h3>
+            <p class="text-gray-500">Please wait while we load your available courses.</p>
+            <div class="mt-4">
+                <div class="h-8 w-8 border-4 border-green-200 border-t-green-600 rounded-full animate-spin mx-auto"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Redirect to the Next.js app after a short delay
+            setTimeout(() => {
+                window.location.href = "/courses";
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
+

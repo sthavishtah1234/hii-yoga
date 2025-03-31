@@ -1,0 +1,4 @@
+/admin/*    /admin/login   302
+/courses/*  /courses       200
+/*          /index.html    200
+
