@@ -5,14 +5,13 @@
   "installCommand": "npm install",
   "framework": "nextjs",
   "outputDirectory": ".next",
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/images/(.*)", "dest": "/images/$1" },
-    { "src": "/admin", "dest": "/admin" },
-    { "src": "/admin/(.*)", "dest": "/admin/$1" },
-    { "src": "/courses", "dest": "/courses" },
-    { "src": "/courses/(.*)", "dest": "/courses/$1" },
-    { "src": "/(.*)", "dest": "/$1" }
+  "rewrites": [
+    { "source": "/images/:path*", "destination": "/images/:path*" },
+    { "source": "/admin", "destination": "/admin" },
+    { "source": "/admin/:path*", "destination": "/admin/:path*" },
+    { "source": "/courses", "destination": "/courses" },
+    { "source": "/courses/:path*", "destination": "/courses/:path*" },
+    { "source": "/:path*", "destination": "/:path*" }
   ],
   "headers": [
     {
@@ -34,4 +33,3 @@
     }
   ]
 }
-
