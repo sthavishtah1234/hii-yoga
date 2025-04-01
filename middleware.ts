@@ -15,6 +15,13 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  // Handle logout when going from admin to home
+  if (pathname === "/" && request.headers.get("referer")?.includes("/admin")) {
+    const response = NextResponse.next()
+    response.cookies.delete("adminAuthenticated")
+    return response
+  }
+
   return NextResponse.next()
 }
 

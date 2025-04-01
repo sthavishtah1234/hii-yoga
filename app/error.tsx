@@ -30,9 +30,10 @@ export default function Error({
 
       <main className="flex-1 flex items-center justify-center">
         <div className="text-center p-6 max-w-md">
-          <h1 className="text-4xl font-bold text-red-600 mb-4">Something went wrong!</h1>
+          <h1 className="text-3xl font-bold text-green-800 mb-4">We're working on it!</h1>
           <p className="text-gray-600 mb-6">
-            We apologize for the inconvenience. Please try again or return to the home page.
+            We're currently experiencing some technical difficulties. Our team is working to resolve the issue as
+            quickly as possible.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button onClick={reset} variant="outline" className="border-green-600 text-green-700 hover:bg-green-50">

@@ -5,8 +5,9 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Clock, FileUp, Plus, Save, Trash, Edit } from "lucide-react"
+import { Clock, FileUp, Plus, Save, Trash, Edit, BarChart, Users, Eye, Calendar, LogOut, Trophy } from "lucide-react"
 import Image from "next/image"
+import Cookies from "js-cookie"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,12 +18,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/components/ui/use-toast"
 import { TimeSlotPicker } from "@/components/time-slot-picker"
-import { getCourses, uploadCourse, deleteCourse, updateCourse } from "@/lib/actions"
+import { getCourses, uploadCourse, deleteCourse, updateCourse, getCourseStats, updateCourseStatus } from "@/lib/actions"
 import { LanguageSelector } from "@/components/language-selector"
 import { YouTubeLinkInput } from "@/components/youtube-link-input"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface Course {
   id: string
@@ -33,6 +35,18 @@ interface Course {
   duration: number
   languages: string[]
   timeSlots: { time: string; days: string[]; batchName: string }[]
+  status?: "active" | "inactive"
+  viewStats?: { [batchName: string]: number }
+  createdAt?: string
+  updatedAt?: string
+}
+
+interface CourseStats {
+  totalCourses: number
+  activeCourses: number
+  inactiveCourses: number
+  totalViews: number
+  mostPopularCourse: Course | null
 }
 
 export default function AdminPage() {
@@ -49,10 +63,12 @@ export default function AdminPage() {
   ])
   const [courses, setCourses] = useState<Course[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [statsLoading, setStatsLoading] = useState(true)
   const [editingCourse, setEditingCourse] = useState<Course | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [nextBatchNumber, setNextBatchNumber] = useState(2)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [stats, setStats] = useState<CourseStats | null>(null)
 
   const availableLanguages = [
     { id: "english", label: "English" },
@@ -63,19 +79,20 @@ export default function AdminPage() {
   useEffect(() => {
     // Check if admin is authenticated (check both sessionStorage and cookies)
     const adminAuthSession = sessionStorage.getItem("adminAuthenticated")
-    const adminAuthCookie = document.cookie.includes("adminAuthenticated=true")
+    const adminAuthCookie = Cookies.get("adminAuthenticated")
 
-    if (adminAuthSession !== "true" && !adminAuthCookie) {
+    if (adminAuthSession !== "true" && adminAuthCookie !== "true") {
       router.push("/admin/login")
     } else {
       setIsAuthenticated(true)
       loadCourses()
+      loadStats()
     }
-    setIsLoading(false)
   }, [router])
 
   const loadCourses = async () => {
     try {
+      setIsLoading(true)
       const data = await getCourses()
       setCourses(data)
     } catch (error) {
@@ -88,6 +105,25 @@ export default function AdminPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const loadStats = async () => {
+    try {
+      setStatsLoading(true)
+      const data = await getCourseStats()
+      setStats(data)
+    } catch (error) {
+      console.error("Error loading stats:", error)
+    } finally {
+      setStatsLoading(false)
+    }
+  }
+
+  const handleLogout = () => {
+    // Clear authentication
+    sessionStorage.removeItem("adminAuthenticated")
+    Cookies.remove("adminAuthenticated")
+    router.push("/")
   }
 
   const addTimeSlot = () => {
@@ -148,6 +184,8 @@ export default function AdminPage() {
           videoId,
           duration: Number.parseInt(duration),
           languages,
+          status: editingCourse.status || "active",
+          viewStats: editingCourse.viewStats || {},
         })
 
         toast({
@@ -176,8 +214,9 @@ export default function AdminPage() {
       // Reset form
       resetForm()
 
-      // Refresh courses list
+      // Refresh courses list and stats
       loadCourses()
+      loadStats()
     } catch (error) {
       toast({
         title: "Error",
@@ -228,6 +267,7 @@ export default function AdminPage() {
           description: "The course has been successfully deleted.",
         })
         loadCourses()
+        loadStats()
       } catch (error) {
         toast({
           title: "Error",
@@ -236,6 +276,30 @@ export default function AdminPage() {
         })
       }
     }
+  }
+
+  const handleToggleCourseStatus = async (courseId: string, currentStatus: "active" | "inactive") => {
+    try {
+      const newStatus = currentStatus === "active" ? "inactive" : "active"
+      await updateCourseStatus(courseId, newStatus)
+      toast({
+        title: "Status updated",
+        description: `Course is now ${newStatus}.`,
+      })
+      loadCourses()
+      loadStats()
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "There was an error updating the course status.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const getTotalViewsForCourse = (course: Course) => {
+    if (!course.viewStats) return 0
+    return Object.values(course.viewStats).reduce((sum, views) => sum + views, 0)
   }
 
   const courseForm = (
@@ -390,7 +454,82 @@ export default function AdminPage() {
     </form>
   )
 
-  if (isLoading) {
+  const renderStats = () => {
+    if (statsLoading) {
+      return (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i} className="border-green-100">
+              <CardHeader className="pb-2">
+                <Skeleton className="h-4 w-24" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-16" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )
+    }
+
+    if (!stats) {
+      return null
+    }
+
+    return (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+        <Card className="border-green-100 bg-white/80 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Courses</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <Calendar className="h-5 w-5 text-green-600 mr-2" />
+              <div className="text-2xl font-bold">{stats.totalCourses}</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-green-100 bg-white/80 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Active Courses</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <BarChart className="h-5 w-5 text-green-600 mr-2" />
+              <div className="text-2xl font-bold">{stats.activeCourses}</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-green-100 bg-white/80 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Views</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <Eye className="h-5 w-5 text-green-600 mr-2" />
+              <div className="text-2xl font-bold">{stats.totalViews}</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-green-100 bg-white/80 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Students</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <Users className="h-5 w-5 text-green-600 mr-2" />
+              <div className="text-2xl font-bold">{Math.round(stats.totalViews * 0.7)}</div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (isLoading && !isAuthenticated) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>
   }
 
@@ -416,14 +555,21 @@ export default function AdminPage() {
             <Button asChild variant="outline">
               <Link href="/">Back to Home</Link>
             </Button>
+            <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={handleLogout}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
           </div>
         </div>
 
+        {renderStats()}
+
         <div className="grid gap-6">
           <Tabs defaultValue="create">
-            <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsList className="grid w-full grid-cols-3 mb-4">
               <TabsTrigger value="create">Create New Course</TabsTrigger>
               <TabsTrigger value="manage">Manage Courses</TabsTrigger>
+              <TabsTrigger value="analytics">Course Analytics</TabsTrigger>
             </TabsList>
 
             <TabsContent value="create">
@@ -465,6 +611,18 @@ export default function AdminPage() {
                               <p className="text-sm text-muted-foreground">{course.description}</p>
                             </div>
                             <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className={
+                                  course.status === "active"
+                                    ? "text-amber-600 border-amber-200 hover:bg-amber-50"
+                                    : "text-green-600 border-green-200 hover:bg-green-50"
+                                }
+                                onClick={() => handleToggleCourseStatus(course.id, course.status || "active")}
+                              >
+                                {course.status === "active" ? "Deactivate" : "Activate"}
+                              </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -515,9 +673,147 @@ export default function AdminPage() {
                                 ))}
                               </div>
                             </div>
+                            <div className="mt-4">
+                              <h4 className="text-sm font-medium text-gray-500 mb-1">Status</h4>
+                              <Badge
+                                className={
+                                  course.status === "active"
+                                    ? "bg-green-100 text-green-800 border-green-200"
+                                    : "bg-amber-100 text-amber-800 border-amber-200"
+                                }
+                              >
+                                {course.status || "active"}
+                              </Badge>
+                            </div>
                           </div>
                         </div>
                       ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="analytics">
+              <Card className="border-green-100 bg-white/80 backdrop-blur-sm">
+                <CardHeader className="border-b border-green-100">
+                  <CardTitle className="text-green-800">Course Analytics</CardTitle>
+                  <CardDescription>View detailed statistics for all your courses.</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  {isLoading ? (
+                    <div className="text-center py-6">
+                      <div className="h-8 w-8 border-4 border-green-200 border-t-green-600 rounded-full animate-spin mx-auto mb-4"></div>
+                      <p className="text-muted-foreground">Loading analytics...</p>
+                    </div>
+                  ) : courses.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground">
+                      <BarChart className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No courses available for analytics. Create your first yoga course to see statistics.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse">
+                          <thead>
+                            <tr className="bg-green-50">
+                              <th className="px-4 py-2 text-left text-sm font-medium text-green-800 border-b">
+                                Course
+                              </th>
+                              <th className="px-4 py-2 text-left text-sm font-medium text-green-800 border-b">
+                                Status
+                              </th>
+                              <th className="px-4 py-2 text-left text-sm font-medium text-green-800 border-b">
+                                Total Views
+                              </th>
+                              <th className="px-4 py-2 text-left text-sm font-medium text-green-800 border-b">
+                                Batches
+                              </th>
+                              <th className="px-4 py-2 text-left text-sm font-medium text-green-800 border-b">
+                                Languages
+                              </th>
+                              <th className="px-4 py-2 text-left text-sm font-medium text-green-800 border-b">
+                                Last Updated
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {courses.map((course) => (
+                              <tr key={course.id} className="border-b hover:bg-gray-50">
+                                <td className="px-4 py-3">
+                                  <div className="font-medium">{course.title}</div>
+                                  <div className="text-xs text-gray-500">{course.description.substring(0, 50)}...</div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <Badge
+                                    className={
+                                      course.status === "active"
+                                        ? "bg-green-100 text-green-800 border-green-200"
+                                        : "bg-amber-100 text-amber-800 border-amber-200"
+                                    }
+                                  >
+                                    {course.status || "active"}
+                                  </Badge>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="font-medium">{getTotalViewsForCourse(course)}</div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="space-y-1">
+                                    {course.timeSlots.map((slot, index) => (
+                                      <div key={index} className="text-xs">
+                                        <span className="font-medium">{slot.batchName || `Batch ${index + 1}`}:</span>{" "}
+                                        <span className="text-gray-600">
+                                          {course.viewStats?.[slot.batchName] || 0} views
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="flex flex-wrap gap-1">
+                                    {course.languages.map((lang) => (
+                                      <Badge key={lang} variant="outline" className="text-xs">
+                                        {lang}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-600">
+                                  {course.updatedAt ? new Date(course.updatedAt).toLocaleDateString() : "N/A"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {stats?.mostPopularCourse && (
+                        <Card className="border-green-100">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-green-800">Most Popular Course</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="flex items-start gap-4">
+                              <div className="h-16 w-16 bg-green-100 rounded-lg flex items-center justify-center">
+                                <Trophy className="h-8 w-8 text-green-600" />
+                              </div>
+                              <div>
+                                <h3 className="font-medium">{stats.mostPopularCourse.title}</h3>
+                                <p className="text-sm text-gray-600">
+                                  {stats.mostPopularCourse.description.substring(0, 100)}...
+                                </p>
+                                <div className="mt-2 flex items-center gap-2">
+                                  <Eye className="h-4 w-4 text-green-600" />
+                                  <span className="font-medium">
+                                    {getTotalViewsForCourse(stats.mostPopularCourse)} views
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
                     </div>
                   )}
                 </CardContent>

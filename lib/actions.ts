@@ -1,9 +1,10 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { v4 as uuidv4 } from "uuid"
 
-// Mock database - in a real app, you would use a database
-let courses = [
+// Mock data to use instead of database
+const mockCourses = [
   {
     id: "1",
     title: "Morning Energizing Flow",
@@ -16,6 +17,10 @@ let courses = [
       { time: "07:00", days: ["Monday", "Wednesday", "Friday"], batchName: "Batch 1" },
       { time: "18:00", days: ["Tuesday", "Thursday"], batchName: "Batch 2" },
     ],
+    status: "active",
+    viewStats: { "Batch 1": 12, "Batch 2": 8 },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   },
   {
     id: "2",
@@ -29,6 +34,10 @@ let courses = [
       { time: "07:00", days: ["Monday", "Wednesday", "Friday"], batchName: "Morning Batch" },
       { time: "18:00", days: ["Tuesday", "Thursday"], batchName: "Evening Batch" },
     ],
+    status: "active",
+    viewStats: { "Morning Batch": 15, "Evening Batch": 10 },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   },
   {
     id: "3",
@@ -42,17 +51,48 @@ let courses = [
       { time: "07:00", days: ["Monday", "Wednesday", "Friday"], batchName: "Beginner Batch" },
       { time: "19:30", days: ["Tuesday", "Thursday", "Saturday"], batchName: "Advanced Batch" },
     ],
+    status: "active",
+    viewStats: { "Beginner Batch": 7, "Advanced Batch": 5 },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   },
 ]
 
+// In-memory storage for courses
+let courses = [...mockCourses]
+
+export interface Course {
+  id: string
+  title: string
+  description: string
+  content: string
+  videoId: string
+  duration: number
+  languages: string[]
+  timeSlots: { time: string; days: string[]; batchName: string }[]
+  status: "active" | "inactive"
+  viewStats: { [batchName: string]: number }
+  createdAt: string
+  updatedAt: string
+}
+
 export async function getCourses() {
-  // In a real app, you would fetch from a database
-  return courses
+  try {
+    return courses
+  } catch (error) {
+    console.error("Error in getCourses:", error)
+    return []
+  }
 }
 
 export async function getCourseById(id: string) {
-  // In a real app, you would fetch from a database
-  return courses.find((course) => course.id === id) || null
+  try {
+    const course = courses.find((course) => course.id === id)
+    return course || null
+  } catch (error) {
+    console.error("Error in getCourseById:", error)
+    return null
+  }
 }
 
 export async function uploadCourse(courseData: {
@@ -64,19 +104,27 @@ export async function uploadCourse(courseData: {
   duration: number
   languages: string[]
 }) {
-  // In a real app, you would save to a database
-  const newCourse = {
-    id: Date.now().toString(),
-    ...courseData,
+  try {
+    const newCourse = {
+      id: uuidv4(),
+      ...courseData,
+      status: "active" as const,
+      viewStats: {},
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    courses.push(newCourse)
+
+    // Revalidate the courses page
+    revalidatePath("/courses")
+    revalidatePath("/admin")
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error in uploadCourse:", error)
+    throw error
   }
-
-  courses = [...courses, newCourse]
-
-  // Revalidate the courses page
-  revalidatePath("/courses")
-  revalidatePath("/admin")
-
-  return { success: true }
 }
 
 export async function updateCourse(courseData: {
@@ -88,33 +136,132 @@ export async function updateCourse(courseData: {
   videoId: string
   duration: number
   languages: string[]
+  status?: "active" | "inactive"
+  viewStats?: { [batchName: string]: number }
 }) {
-  // In a real app, you would update in a database
-  const { id } = courseData
-  const courseIndex = courses.findIndex((course) => course.id === id)
+  try {
+    const { id, ...updateData } = courseData
 
-  if (courseIndex === -1) {
-    throw new Error("Course not found")
+    const courseIndex = courses.findIndex((course) => course.id === id)
+    if (courseIndex === -1) {
+      throw new Error("Course not found")
+    }
+
+    courses[courseIndex] = {
+      ...courses[courseIndex],
+      ...updateData,
+      updatedAt: new Date().toISOString(),
+    }
+
+    // Revalidate the courses page
+    revalidatePath("/courses")
+    revalidatePath("/admin")
+    revalidatePath(`/courses/${id}`)
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error in updateCourse:", error)
+    throw error
   }
-
-  courses[courseIndex] = courseData
-
-  // Revalidate the courses page
-  revalidatePath("/courses")
-  revalidatePath("/admin")
-  revalidatePath(`/courses/${id}`)
-
-  return { success: true }
 }
 
 export async function deleteCourse(id: string) {
-  // In a real app, you would delete from a database
-  courses = courses.filter((course) => course.id !== id)
+  try {
+    courses = courses.filter((course) => course.id !== id)
 
-  // Revalidate the courses page
-  revalidatePath("/courses")
-  revalidatePath("/admin")
+    // Revalidate the courses page
+    revalidatePath("/courses")
+    revalidatePath("/admin")
 
-  return { success: true }
+    return { success: true }
+  } catch (error) {
+    console.error("Error in deleteCourse:", error)
+    throw error
+  }
+}
+
+export async function incrementCourseViews(courseId: string, batchName: string) {
+  try {
+    const courseIndex = courses.findIndex((course) => course.id === courseId)
+    if (courseIndex === -1) {
+      throw new Error("Course not found")
+    }
+
+    const course = courses[courseIndex]
+    const viewStats = course.viewStats || {}
+    viewStats[batchName] = (viewStats[batchName] || 0) + 1
+
+    courses[courseIndex] = {
+      ...course,
+      viewStats,
+      updatedAt: new Date().toISOString(),
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error in incrementCourseViews:", error)
+    throw error
+  }
+}
+
+export async function updateCourseStatus(courseId: string, status: "active" | "inactive") {
+  try {
+    const courseIndex = courses.findIndex((course) => course.id === courseId)
+    if (courseIndex === -1) {
+      throw new Error("Course not found")
+    }
+
+    courses[courseIndex] = {
+      ...courses[courseIndex],
+      status,
+      updatedAt: new Date().toISOString(),
+    }
+
+    // Revalidate the courses page
+    revalidatePath("/courses")
+    revalidatePath("/admin")
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error in updateCourseStatus:", error)
+    throw error
+  }
+}
+
+export async function getCourseStats() {
+  try {
+    // Calculate total views across all courses
+    const totalViews = courses.reduce((sum, course) => {
+      const courseViews = Object.values(course.viewStats || {}).reduce((a, b) => a + b, 0)
+      return sum + courseViews
+    }, 0)
+
+    // Count active and inactive courses
+    const activeCourses = courses.filter((course) => course.status === "active").length
+    const inactiveCourses = courses.filter((course) => course.status === "inactive").length
+
+    // Get most popular course
+    let mostPopularCourse = null
+    let maxViews = 0
+
+    courses.forEach((course) => {
+      const courseViews = Object.values(course.viewStats || {}).reduce((a, b) => a + b, 0)
+      if (courseViews > maxViews) {
+        maxViews = courseViews
+        mostPopularCourse = course
+      }
+    })
+
+    return {
+      totalCourses: courses.length,
+      activeCourses,
+      inactiveCourses,
+      totalViews,
+      mostPopularCourse,
+    }
+  } catch (error) {
+    console.error("Error in getCourseStats:", error)
+    return null
+  }
 }
 

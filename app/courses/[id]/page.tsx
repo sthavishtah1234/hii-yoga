@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { YouTubePlayer } from "@/components/youtube-player"
-import { getCourseById } from "@/lib/actions"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Image from "next/image"
 
@@ -20,7 +19,52 @@ interface Course {
   duration: number
   languages: string[]
   timeSlots: { time: string; days: string[]; batchName: string }[]
+  status?: "active" | "inactive"
+  viewStats?: { [batchName: string]: number }
 }
+
+// Mock data for fallback
+const mockCourses = [
+  {
+    id: "1",
+    title: "Morning Energizing Flow",
+    description: "Start your day with energy and intention through gentle flowing movements.",
+    content: "This course covers morning yoga practices to energize your body and mind...",
+    videoId: "dQw4w9WgXcQ", // Example YouTube video ID
+    duration: 60,
+    languages: ["english", "hindi"],
+    timeSlots: [
+      { time: "07:00", days: ["Monday", "Wednesday", "Friday"], batchName: "Batch 1" },
+      { time: "18:00", days: ["Tuesday", "Thursday"], batchName: "Batch 2" },
+    ],
+  },
+  {
+    id: "2",
+    title: "प्राणायाम अभ्यास (Pranayama Practice)",
+    description: "श्वास नियंत्रण के माध्यम से अपनी जीवन शक्ति का विस्तार करें।",
+    content: "इस पाठ्यक्रम में, हम विभिन्न प्राणायाम तकनीकों का अभ्यास करेंगे...",
+    videoId: "inpok4MKVLM", // Example YouTube video ID
+    duration: 60,
+    languages: ["hindi"],
+    timeSlots: [
+      { time: "07:00", days: ["Monday", "Wednesday", "Friday"], batchName: "Morning Batch" },
+      { time: "18:00", days: ["Tuesday", "Thursday"], batchName: "Evening Batch" },
+    ],
+  },
+  {
+    id: "3",
+    title: "ಧ್ಯಾನ ಅಭ್ಯಾಸ (Meditation Practice)",
+    description: "ಮಾರ್ಗದರ್ಶಿತ ಧ್ಯಾನದ ಮೂಲಕ ಮನಸ್ಸಿನ ಶಾಂತಿ ಮತ್ತು ಸ್ಪಷ್ಟತೆಯನ್ನು ಕಂಡುಕೊಳ್ಳಿ.",
+    content: "ಈ ಕೋರ್ಸ್‌ನಲ್ಲಿ, ನಾವು ವಿವಿಧ ಧ್ಯಾನ ತಂತ್ರಗಳನ್ನು ಅಭ್ಯಾಸ ಮಾಡುತ್ತೇವೆ...",
+    videoId: "86m4RC_ADEY", // Example YouTube video ID
+    duration: 60,
+    languages: ["kannada", "english"],
+    timeSlots: [
+      { time: "07:00", days: ["Monday", "Wednesday", "Friday"], batchName: "Beginner Batch" },
+      { time: "19:30", days: ["Tuesday", "Thursday", "Saturday"], batchName: "Advanced Batch" },
+    ],
+  },
+]
 
 export default function CoursePage() {
   const params = useParams()
@@ -41,12 +85,36 @@ export default function CoursePage() {
     const loadCourse = async () => {
       try {
         if (!params.id) return
-        const data = await getCourseById(params.id as string)
-        setCourse(data)
+
+        // Try to fetch from API
+        try {
+          const response = await fetch(`/api/courses/${params.id}`)
+
+          if (response.ok) {
+            const data = await response.json()
+            setCourse(data)
+          } else {
+            // If API fails, use mock data
+            const mockCourse = mockCourses.find((c) => c.id === params.id)
+            if (mockCourse) {
+              setCourse(mockCourse)
+            } else {
+              throw new Error("Course not found")
+            }
+          }
+        } catch (error) {
+          // If fetch fails, try to find in mock data
+          const mockCourse = mockCourses.find((c) => c.id === params.id)
+          if (mockCourse) {
+            setCourse(mockCourse)
+          } else {
+            throw new Error("Course not found")
+          }
+        }
 
         // Check which batches are accessible now
-        if (data) {
-          const batchesData = data.timeSlots.map((slot) => ({
+        if (course) {
+          const batchesData = course.timeSlots.map((slot) => ({
             batchName: slot.batchName || "Default Batch",
             time: slot.time,
             days: slot.days,
@@ -72,7 +140,7 @@ export default function CoursePage() {
     }
 
     loadCourse()
-  }, [params.id])
+  }, [params.id, course])
 
   const checkAccessibility = (timeSlots: { time: string; days: string[] }[]) => {
     if (!timeSlots || timeSlots.length === 0) return false

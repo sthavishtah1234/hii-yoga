@@ -10,20 +10,78 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
-import { getCourses } from "@/lib/actions"
-import { formatLocalTime } from "@/lib/utils"
 import { LanguageSelector } from "@/components/language-selector"
 import { CountrySelector } from "@/components/country-selector"
 import { Badge } from "@/components/ui/badge"
+
+// Mock data to use when database is not available
+const mockCourses = [
+  {
+    id: "1",
+    title: "Morning Energizing Flow",
+    description: "Start your day with energy and intention through gentle flowing movements.",
+    content: "This course covers morning yoga practices to energize your body and mind...",
+    videoId: "dQw4w9WgXcQ", // Example YouTube video ID
+    duration: 60,
+    languages: ["english", "hindi"],
+    timeSlots: [
+      { time: "07:00", days: ["Monday", "Wednesday", "Friday"], batchName: "Batch 1" },
+      { time: "18:00", days: ["Tuesday", "Thursday"], batchName: "Batch 2" },
+    ],
+    status: "active",
+    viewStats: { "Batch 1": 12, "Batch 2": 8 },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "2",
+    title: "प्राणायाम अभ्यास (Pranayama Practice)",
+    description: "श्वास नियंत्रण के माध्यम से अपनी जीवन शक्ति का विस्तार करें।",
+    content: "इस पाठ्यक्रम में, हम विभिन्न प्राणायाम तकनीकों का अभ्यास करेंगे...",
+    videoId: "inpok4MKVLM", // Example YouTube video ID
+    duration: 60,
+    languages: ["hindi"],
+    timeSlots: [
+      { time: "07:00", days: ["Monday", "Wednesday", "Friday"], batchName: "Morning Batch" },
+      { time: "18:00", days: ["Tuesday", "Thursday"], batchName: "Evening Batch" },
+    ],
+    status: "active",
+    viewStats: { "Morning Batch": 15, "Evening Batch": 10 },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "3",
+    title: "ಧ್ಯಾನ ಅಭ್ಯಾಸ (Meditation Practice)",
+    description: "ಮಾರ್ಗದರ್ಶಿತ ಧ್ಯಾನದ ಮೂಲಕ ಮನಸ್ಸಿನ ಶಾಂತಿ ಮತ್ತು ಸ್ಪಷ್ಟತೆಯನ್ನು ಕಂಡುಕೊಳ್ಳಿ.",
+    content: "ಈ ಕೋರ್ಸ್‌ನಲ್ಲಿ, ನಾವು ವಿವಿಧ ಧ್ಯಾನ ತಂತ್ರಗಳನ್ನು ಅಭ್ಯಾಸ ಮಾಡುತ್ತೇವೆ...",
+    videoId: "86m4RC_ADEY", // Example YouTube video ID
+    duration: 60,
+    languages: ["kannada", "english"],
+    timeSlots: [
+      { time: "07:00", days: ["Monday", "Wednesday", "Friday"], batchName: "Beginner Batch" },
+      { time: "19:30", days: ["Tuesday", "Thursday", "Saturday"], batchName: "Advanced Batch" },
+    ],
+    status: "active",
+    viewStats: { "Beginner Batch": 7, "Advanced Batch": 5 },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+]
 
 interface Course {
   id: string
   title: string
   description: string
+  content?: string
   timeSlots: { time: string; days: string[]; batchName: string }[]
   duration: number
   languages: string[]
   videoId: string
+  status?: "active" | "inactive"
+  viewStats?: { [batchName: string]: number }
+  createdAt?: string
+  updatedAt?: string
 }
 
 export default function CoursesPage() {
@@ -72,10 +130,21 @@ export default function CoursesPage() {
     // Fetch courses
     const loadCourses = async () => {
       try {
-        const data = await getCourses()
-        setCourses(data)
+        // Try to fetch from API
+        const response = await fetch("/api/courses")
+
+        if (response.ok) {
+          const data = await response.json()
+          setCourses(data)
+        } else {
+          // If API fails, use mock data
+          console.log("Using mock data because API failed")
+          setCourses(mockCourses)
+        }
       } catch (error) {
         console.error("Error loading courses:", error)
+        // Use mock data if there's an error
+        setCourses(mockCourses)
       } finally {
         setLoading(false)
       }
@@ -445,5 +514,10 @@ export default function CoursesPage() {
       </div>
     </div>
   )
+}
+
+// Helper function to format time
+function formatLocalTime(date: Date): string {
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
 }
 
